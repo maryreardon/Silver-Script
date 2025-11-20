@@ -4,7 +4,7 @@ import { generateLessonContent, sendChatMessage } from './services/geminiService
 import { LessonCard } from './components/LessonCard';
 import { Button } from './components/Button';
 import ReactMarkdown from 'react-markdown';
-import { ArrowLeft, MessageCircle, Sparkles, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Sparkles, Volume2, VolumeX, Mic, MicOff } from 'lucide-react';
 
 // Hardcoded curriculum
 const TOPICS: LessonTopic[] = [
@@ -38,6 +38,14 @@ const TOPICS: LessonTopic[] = [
   }
 ];
 
+// Add Web Speech API types support
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>(AppView.HOME);
   const [currentTopic, setCurrentTopic] = useState<LessonTopic | null>(null);
@@ -47,6 +55,7 @@ const App: React.FC = () => {
   const [userMessage, setUserMessage] = useState<string>('');
   const [isChatLoading, setIsChatLoading] = useState<boolean>(false);
   const [isSpeechEnabled, setIsSpeechEnabled] = useState<boolean>(false);
+  const [isListening, setIsListening] = useState<boolean>(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -102,6 +111,54 @@ const App: React.FC = () => {
     if (!newState) {
       window.speechSynthesis.cancel();
     }
+  };
+
+  const toggleMicrophone = () => {
+    if (isListening) {
+      // Stop listening logic is handled by the recognition object ending, 
+      // but we can force state reset here if needed.
+      setIsListening(false);
+      // Note: The actual recognition instance isn't stored in state to call .stop(), 
+      // but clicking the button again usually implies the user is done.
+      // For simplicity in this stateless-ish function, we rely on the browser's natural timeout 
+      // or let the user click send.
+      return;
+    }
+
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert("I'm sorry, but your browser doesn't support voice typing. Please try using Google Chrome.");
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setUserMessage((prev) => {
+        // Add a space if there is already text
+        return prev + (prev.length > 0 ? ' ' : '') + transcript;
+      });
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
   return (
@@ -288,18 +345,33 @@ const App: React.FC = () => {
 
                 <div className="p-4 bg-white border-t border-slate-200">
                   <form onSubmit={handleSendMessage} className="flex flex-col gap-3">
-                    <textarea
-                      value={userMessage}
-                      onChange={(e) => setUserMessage(e.target.value)}
-                      placeholder="Type your question here..."
-                      className="w-full p-4 text-lg border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none resize-none min-h-[80px]"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                    />
+                    <div className="relative">
+                      <textarea
+                        value={userMessage}
+                        onChange={(e) => setUserMessage(e.target.value)}
+                        placeholder="Type your question or use the microphone..."
+                        className="w-full p-4 pr-16 text-lg border-2 border-slate-300 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none resize-none min-h-[80px]"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={toggleMicrophone}
+                        className={`absolute bottom-3 right-3 p-3 rounded-full transition-all duration-300 ${
+                          isListening 
+                            ? 'bg-red-500 text-white animate-pulse shadow-lg' 
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                        aria-label={isListening ? "Stop listening" : "Start voice input"}
+                        title="Click to speak"
+                      >
+                        {isListening ? <MicOff size={24} /> : <Mic size={24} />}
+                      </button>
+                    </div>
                     <Button 
                       type="submit" 
                       disabled={!userMessage.trim() || isChatLoading}

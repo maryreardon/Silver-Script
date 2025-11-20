@@ -1,5 +1,7 @@
 {
   "name": "SilverScript",
   "description": "A coding learning platform tailored for seniors, featuring large typography, high-contrast accessibility, and a patient AI tutor powered by Gemini to explain concepts with simple analogies.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "microphone"
+  ]
 }

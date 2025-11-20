@@ -46,29 +46,28 @@ export const sendChatMessage = async (
   currentContext: string
 ): Promise<string> => {
   try {
-    // We construct a chat history for the model
-    // In a real app, we would use ai.chats.create and maintain the session object.
-    // For this stateless implementation, we'll append context to the prompt or use a fresh chat each turn with history context if needed.
-    // To keep it simple and robust, we'll use a single generateContent call with the conversation context.
+    // Inject the current lesson context into the system instruction
+    // This ensures the model knows exactly what the student is reading.
+    const dynamicSystemInstruction = `${TUTOR_SYSTEM_INSTRUCTION}
+    
+    CONTEXT FOR CURRENT LESSON:
+    The student is currently reading a lesson about:
+    ${currentContext.substring(0, 1500)}... (content truncated for brevity)
+    
+    Use this context to answer their questions specifically regarding this material.`;
 
-    const conversationString = history.map(m => `${m.role === 'user' ? 'Student' : 'Tutor'}: ${m.text}`).join('\n');
-    
-    const prompt = `
-    Current Lesson Context: ${currentContext.substring(0, 500)}... (context truncated)
-    
-    Conversation History:
-    ${conversationString}
-    
-    Student: ${newMessage}
-    Tutor:`;
-
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const chat = ai.chats.create({
       model: 'gemini-2.5-flash',
-      contents: prompt,
       config: {
-        systemInstruction: TUTOR_SYSTEM_INSTRUCTION,
-      }
+        systemInstruction: dynamicSystemInstruction,
+      },
+      history: history.map(m => ({
+        role: m.role,
+        parts: [{ text: m.text }]
+      }))
     });
+
+    const response: GenerateContentResponse = await chat.sendMessage({ message: newMessage });
 
     return response.text || "I didn't quite catch that. Could you say it again?";
   } catch (error) {
