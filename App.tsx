@@ -4,7 +4,7 @@ import { generateLessonContent, sendChatMessage } from './services/geminiService
 import { LessonCard } from './components/LessonCard';
 import { Button } from './components/Button';
 import ReactMarkdown from 'react-markdown';
-import { ArrowLeft, MessageCircle, Sparkles, Volume2, VolumeX, Mic, MicOff } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Sparkles, Volume2, VolumeX, Mic, MicOff, Share2 } from 'lucide-react';
 
 // Hardcoded curriculum
 const TOPICS: LessonTopic[] = [
@@ -115,13 +115,7 @@ const App: React.FC = () => {
 
   const toggleMicrophone = () => {
     if (isListening) {
-      // Stop listening logic is handled by the recognition object ending, 
-      // but we can force state reset here if needed.
       setIsListening(false);
-      // Note: The actual recognition instance isn't stored in state to call .stop(), 
-      // but clicking the button again usually implies the user is done.
-      // For simplicity in this stateless-ish function, we rely on the browser's natural timeout 
-      // or let the user click send.
       return;
     }
 
@@ -148,7 +142,6 @@ const App: React.FC = () => {
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
       setUserMessage((prev) => {
-        // Add a space if there is already text
         return prev + (prev.length > 0 ? ' ' : '') + transcript;
       });
     };
@@ -159,6 +152,27 @@ const App: React.FC = () => {
     };
 
     recognition.start();
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'SilverScript',
+          text: 'I found this great app to learn coding for seniors!',
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.log('Error sharing:', err);
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('App link copied to clipboard! You can now paste it in an email or message.');
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    }
   };
 
   return (
@@ -176,17 +190,28 @@ const App: React.FC = () => {
             </div>
           </div>
           
-          {view === AppView.LESSON && (
-             <button
-             onClick={toggleSpeech}
-             className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-colors border-2 ${isSpeechEnabled ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : 'bg-slate-100 border-slate-200 text-slate-600'}`}
-             aria-pressed={isSpeechEnabled}
-             aria-label="Toggle voice narration"
-           >
-             {isSpeechEnabled ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-             <span className="text-lg hidden md:inline">{isSpeechEnabled ? "Voice On" : "Voice Off"}</span>
-           </button>
-          )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-full font-medium transition-colors bg-indigo-50 border-2 border-indigo-100 text-indigo-700 hover:bg-indigo-100"
+              aria-label="Share application"
+            >
+              <Share2 className="w-5 h-5 md:w-6 md:h-6" />
+              <span className="hidden md:inline">Share</span>
+            </button>
+
+            {view === AppView.LESSON && (
+               <button
+               onClick={toggleSpeech}
+               className={`flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-full font-medium transition-colors border-2 ${isSpeechEnabled ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : 'bg-slate-100 border-slate-200 text-slate-600'}`}
+               aria-pressed={isSpeechEnabled}
+               aria-label="Toggle voice narration"
+             >
+               {isSpeechEnabled ? <Volume2 className="w-5 h-5 md:w-6 md:h-6" /> : <VolumeX className="w-5 h-5 md:w-6 md:h-6" />}
+               <span className="hidden md:inline">{isSpeechEnabled ? "Voice On" : "Voice Off"}</span>
+             </button>
+            )}
+          </div>
         </div>
       </header>
 
